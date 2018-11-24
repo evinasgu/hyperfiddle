@@ -13,9 +13,11 @@
     [hypercrud.browser.base :as base]
     [hypercrud.browser.browser-request :refer [request-from-route]]
     [hypercrud.browser.context :as context]
+    [hypercrud.util.branch]
     [hyperfiddle.actions :as actions]
     [hyperfiddle.ide.system-fiddle :refer [system-fiddle?]]
     #?(:cljs [hyperfiddle.ui :as ui])
+    ;#?(:cljs [hyperfiddle.ui.util :refer [writable-entity?]])
     #?(:cljs [hyperfiddle.ide.hf-live :as hf-live])
     #?(:cljs [hypercrud.ui.error :as ui-error])
     #?(:cljs [hypercrud.ui.stale :as stale])
@@ -25,6 +27,7 @@
     [hyperfiddle.route :as route]
     [hyperfiddle.runtime :as runtime]
     [hyperfiddle.schema :as schema]
+    [hyperfiddle.security.client :as security]
     [taoensso.timbre :as timbre]
 
     ; pull in the entire ide app for reference from user-land
@@ -131,22 +134,31 @@
       (schema/hydrate-schemas-for-uris rt branch uris))
     (schema/hydrate-schemas rt branch)))
 
+(defn clone-branch [ide-ctx]
+  (let [can-clone true
+        should-clone (not (security/writable-db? "$" ide-ctx))] ; fiddle src
+    (if (and can-clone should-clone)
+      (hypercrud.util.branch/encode-branch-child (:branch ide-ctx) "clone")
+      (:branch ide-ctx))))
+
 ; todo should summon route via context/target-route. but there is still tension in the data api for deferred popovers
 (defn api [[fiddle :as route] ctx]
   {:pre [route (not (string? route))]}
   (case (get-in ctx [::runtime/branch-aux ::foo])
-    "page" (let [ide-ctx (page-ide-context ctx)]
+    "page" (let [ide-ctx (page-ide-context ctx)
+                 ?clone-branch (clone-branch ide-ctx)]
              (into
                (cond
                  (:active-ide? (runtime/host-env (:peer ctx)))
                  (concat (request-from-route (topnav-route route ctx) ide-ctx)
-                         (request-from-route (ide-route route ctx) ide-ctx))
+                         (request-from-route (ide-route route ctx)
+                                             (assoc ide-ctx :branch ?clone-branch)))
 
                  @(runtime/state (:peer ctx) [::runtime/domain :domain/environment :enable-hf-live?])
                  (request-from-route (ide-route route ctx) ide-ctx))
                (if (magic-ide-fiddle? fiddle (get-in ctx [:hypercrud.browser/domain :domain/ident]))
                  (request-from-route route ide-ctx)
-                 (request-from-route route (page-target-context ctx)))))
+                 (request-from-route route (assoc (page-target-context ctx) :branch ?clone-branch)))))
     "ide" (request-from-route route (leaf-ide-context ctx))
     "user" (request-from-route route (leaf-target-context ctx))))
 
@@ -202,15 +214,16 @@
            {:keys [:active-ide?]} (runtime/host-env (:peer ctx))
            is-editor (and active-ide?
                           (not is-magic-ide-fiddle)
-                          (not (system-fiddle? fiddle))     ; Schema editor, console links
-                          )]
+                          (not (system-fiddle? fiddle)))    ; Schema editor, console links
+           ?clone-branch (clone-branch ide-ctx)]
 
        [:<> {:key "view-page"}
 
         ; Topnav
         (when active-ide?
           [ui/iframe
-           (assoc ide-ctx :hypercrud.ui/error (r/constantly ui-error/error-inline))
+           (assoc ide-ctx :hypercrud.ui/error (r/constantly ui-error/error-inline)
+                          ::clone-branch ?clone-branch)      ; indicate the branch for the clone button, but dont use the branch
            {:route (topnav-route route ctx)
             :class "hidden-print"}])
 
@@ -218,8 +231,10 @@
         (cond
           ; tunneled ide route like /hyperfiddle.ide/domain - primary, blue background (IDE),
           is-magic-ide-fiddle ^{:key :primary-content} [ui/iframe ide-ctx {:route route :class "devsrc"}]
-
-          is-editor [primary-content-ide ide-ctx (page-target-context ctx) route]
+          is-editor [primary-content-ide
+                     (assoc ide-ctx :branch ?clone-branch)   ; both ide and userland need to branch, because the fiddle meta req.
+                     (assoc (page-target-context ctx) :branch ?clone-branch) ; we know they branch together
+                     route]
 
           :else [primary-content-production (page-target-context ctx) route]
           )])))

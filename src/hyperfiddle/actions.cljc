@@ -236,7 +236,9 @@
 (defn stage-popover [rt branch swap-fn-async & on-start]    ; todo rewrite in terms of with-groups
   (fn [dispatch! get-state]
     (p/then (swap-fn-async)
-            (fn [{:keys [tx app-route]}]
+            (fn [{:keys [tx
+                         app-route                          ; app-route has special handling, it's not a generic action here
+                         app-actions]}]
               (let [with-actions (mapv (fn [[uri tx]]
                                          (let [tx (update-to-tempids get-state branch uri tx)]
                                            [:with branch uri tx]))
@@ -256,7 +258,8 @@
                                                               vec)]
                                           (concat clear-uris ; clear the uris that were transacted
                                                   [[:merge branch] ; merge the untransacted uris up
-                                                   (discard-partition branch)])) ; clean up the partition
+                                                   (discard-partition branch)] ; clean up the partition
+                                                  app-actions)) ; userland special actions
                                :route app-route)
                     (either/branch
                       (or (some-> app-route route/validate-route+) (either/right nil)) ; arbitrary user input, need to validate

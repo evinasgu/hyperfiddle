@@ -288,7 +288,7 @@ User renderers should not be exposed to the reaction."
             nil))]
   (defn ui-from-link [link-ref ctx & [props ?label]]
     {:pre [link-ref]}
-    (let [visual-ctx ctx
+    (let [anchor-ctx ctx
           ctx (context/refocus ctx (link/read-path @(r/fmap :link/path link-ref)))
           error-comp (ui-error/error-comp ctx)
           +args @(r/fmap->> link-ref (routing/build-args+ ctx))
@@ -313,7 +313,7 @@ User renderers should not be exposed to the reaction."
                         (update :class css "hyperfiddle")   ; should this be in popover-cmp? what is this class? – unify with semantic css
                         (update :disabled #(or % (disabled? link-ref ctx))))
               label @(r/track prompt link-ref ?label)]
-          [popover-cmp link-ref eav ctx visual-ctx props label])
+          [popover-cmp link-ref eav ctx anchor-ctx props label])
 
         is-iframe
         [stale/loading (stale/can-be-loading? ctx) (fmap #(route/assoc-frag % (:frag props)) @r+?route) ; what is this frag noise?

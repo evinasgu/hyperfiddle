@@ -61,6 +61,7 @@
                                               (fmap
                                                 (fn [tx]
                                                   (-> {:tx {(hypercrud.browser.context/uri ctx) tx}
+                                                       :app-actions (if-let [f (::actions props)] (f))
                                                        :app-route (if-let [f (::redirect props)] (f @r-popover-data))}
                                                       dissoc-nils))))
                                         (actions/close-popover (:branch ctx) popover-id))
@@ -113,10 +114,11 @@
               (-> (->> (swap-fn-async)
                        (fmap (fn [tx]
                                (-> {:tx {(hypercrud.browser.context/uri ctx) tx}
+                                    :app-actions (if-let [f (::actions props)] (f))
                                     :app-route (if-let [f (::redirect props)] (f popover-data))}
                                    dissoc-nils))))
                   (p/then
-                    (fn [{:keys [tx app-route]}]
+                    (fn [{:keys [tx app-route app-actions]}]
                       (->> (actions/with-groups (:peer ctx) (:branch ctx) tx :route app-route)
                            (runtime/dispatch! (:peer ctx)))))))]
       (with-swap-fn link-ref eav ctx f))))
@@ -128,17 +130,20 @@
                   (update :class css "btn-warning"))]
     [:button props [:span (str label "!")]]))
 
-(defn popover-cmp [link-ref eav ctx visual-ctx props label]
+(defn child-branch-fac [link-ref ctx anchor-ctx props]
   ; try to auto-generate branch/popover-id from the product of:
   ; - link's :db/id
   ; - route
   ; - visual-ctx's data & path (where this popover is being drawn NOT its dependencies)
-  (let [child-branch (let [child-id-str (-> [(tempid/tempid-from-ctx visual-ctx)
-                                             @(r/fmap :db/id link-ref)
-                                             (:route props)
-                                             @(r/fmap (r/partial stable-entity-key ctx) (:hypercrud.browser/fiddle ctx))]
-                                            hash str)]
-                       (branch/encode-branch-child (:branch ctx) child-id-str))
+  (let [child-id-str (-> [(tempid/tempid-from-ctx anchor-ctx)
+                          @(r/fmap :db/id link-ref)
+                          (:route props)
+                          @(r/fmap (r/partial stable-entity-key ctx) (:hypercrud.browser/fiddle ctx))]
+                         hash str)]
+    (branch/encode-branch-child (:branch ctx) child-id-str)))
+
+(defn popover-cmp [link-ref eav ctx anchor-ctx props label]
+  (let [child-branch (child-branch-fac link-ref ctx anchor-ctx props)
         popover-id child-branch                             ; just use child-branch as popover-id
         child-branch (when @(r/fmap (r/comp some? blank->nil :link/tx-fn) link-ref)
                        child-branch)

@@ -13,7 +13,9 @@
 (defn decode-parent-branch "nil is a valid branch" [branch]
   (some->> branch (re-find #"(.*)`.*") second blank->nil))
 
-(defn encode-branch-child [parent-branch child-id-str]
+(defn encode-branch-child
+  "child-id-str can be anything, you coordinate it yourself, but you should choose it to be unique"
+  [parent-branch child-id-str]
   (if (str/blank? child-id-str)
     parent-branch
     (str parent-branch "`" child-id-str)))

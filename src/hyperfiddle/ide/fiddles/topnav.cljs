@@ -65,8 +65,18 @@
                                                 :tooltip (cond
                                                            (and anonymous? disabled?) [:warning "Please login"]
                                                            disabled? [:warning "Writes restricted"])
+                                                ;:hyperfiddle.ui.popover/actions #(actions/discard-partition (:hyperfiddle.ide/clone-branch ctx))
                                                 :hyperfiddle.ui.popover/redirect (fn [popover-data]
                                                                                    [(:fiddle/ident popover-data)])}))
+      (ui/link :hf/new :clone-fiddle ctx "clone" (let [disabled? (not (security/can-create? ctx)) ; we explicitly know the context here is $
+                                                       anonymous? (nil? @(runtime/state (:peer ctx) [::runtime/user-id]))]
+                                                   {:disabled disabled?
+                                                    :tooltip (cond
+                                                               (and anonymous? disabled?) [:warning "Please login"]
+                                                               disabled? [:warning "Writes restricted"])
+
+                                                    :hyperfiddle.ui.popover/redirect (fn [popover-data]
+                                                                                       [(:fiddle/ident popover-data)])}))
       [tooltip {:label "Environment administration"} (ui/link :hf/rel :domain ctx "env")]
       (if @(runtime/state (:peer ctx) [::runtime/user-id])
         (if-let [{:keys [:hypercrud.browser/data]} (hyperfiddle.data/browse ctx :hf/iframe :account)]

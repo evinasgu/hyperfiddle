@@ -57,7 +57,9 @@
                                   (-> (mlet [m (maybe (parent-m ctx))
                                              uri (maybe (context/uri ctx))]
                                         (return (or (new-entity? (:peer ctx) uri (:db/id m) (:branch ctx))
-                                                    (contains? (set (:hyperfiddle/owners m)) subject))))
+                                                    (contains? (set (:hyperfiddle/owners m)) subject)
+                                                    (some? (:hyperfiddle.ide/clone-branch ctx))
+                                                    )))
                                       ; ui probably in an invalid/error state when m or uri are nil
                                       (maybe/from-maybe false)))))}))
 
@@ -87,9 +89,8 @@
           false)
         identity)))
 
-(defn writable-entity? [ctx]
-  (-> (mlet [:let [dbname (context/dbname ctx)
-                   hf-db (domain/dbname->hfdb dbname (:hypercrud.browser/domain ctx))
+(defn writable-db? [dbname ctx]
+  (-> (mlet [:let [hf-db (domain/dbname->hfdb dbname (:hypercrud.browser/domain ctx))
                    subject @(runtime/state (:peer ctx) [::runtime/user-id])]
              client-sec (eval-client-sec hf-db)
              :let [f (or (:writable-entity? client-sec) (constantly true))]]
@@ -99,3 +100,6 @@
           (timbre/error e)
           false)
         identity)))
+
+(defn writable-entity? [ctx]
+  (writable-db? (context/dbname ctx) ctx))
