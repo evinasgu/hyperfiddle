@@ -67,7 +67,9 @@
     [:hyperfiddle/topnav ?target-fiddle]))
 
 (defn ide-route [[fiddle-ident :as route] ctx]
-  (let [params (when-not (magic-ide-fiddle? fiddle-ident (get-in ctx [:hypercrud.browser/domain :domain/ident]))
+  (let [fiddle-ident (or @(runtime/state (:peer ctx) [::focused-fiddle])
+                         fiddle-ident)
+        params (when-not (magic-ide-fiddle? fiddle-ident (get-in ctx [:hypercrud.browser/domain :domain/ident]))
                  [[:fiddle/ident fiddle-ident]])]
     [:hyperfiddle/ide params]))
 
@@ -86,14 +88,15 @@
       (*-ide-context)))
 
 #?(:cljs
-   (defn frame-on-click [rt route event]
+   (defn frame-on-click [rt [fiddle :as route] event]
      (when (and route (.-altKey event))                     ; under what circumstances is route nil?
        (let [native-event (.-nativeEvent event)
              anchor (-> (.composedPath native-event) (aget 0) (.matches "a"))
              anchor-descendant (-> (.composedPath native-event) (aget 0) (.matches "a *"))]
          (when-not (or anchor anchor-descendant)
            (.stopPropagation event)
-           (js/window.open (foundation/route-encode rt route) "_blank"))))))
+           (runtime/dispatch! rt (partial actions/ide-focus fiddle))
+           #_(js/window.open (foundation/route-encode rt route) "_blank"))))))
 
 (defn- *-target-context [ctx]
   (assoc ctx

@@ -145,6 +145,11 @@
             (p/then #(hydrate-partition-schema rt branch dispatch! get-state))
             (p/then #(hydrate-partition rt branch dispatch! get-state)))))))
 
+(defn ide-focus [rt fiddle dispatch! get-state]
+  (dispatch! [:hyperfiddle.ide/focus-fiddle fiddle])
+  (let [branch nil]
+    (hydrate-partition rt branch dispatch! get-state)))
+
 (defn update-to-tempids [get-state branch uri tx]
   (let [{:keys [tempid-lookups schemas]} (get-in (get-state) [::runtime/partitions branch])
         schema (get schemas uri)

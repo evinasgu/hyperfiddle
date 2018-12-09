@@ -54,6 +54,12 @@
     :set-display-mode (first args)
     (or display-mode :hypercrud.browser.browser-ui/user)))
 
+(defn ide-focus-reducer [target-fiddle action & [fiddle :as args]]
+  (case action
+    :hyperfiddle.ide/focus-fiddle fiddle
+    ; default target fiddle is extracted from content-domain route, which isn't known yet ?
+    (or target-fiddle nil)))
+
 (defn partitions-reducer [partitions action & args]
   (let [with (fn [partition uri tx]
                (let [schema (get-in partition [:schemas uri])]
@@ -197,6 +203,8 @@
                   :hyperfiddle.runtime/auto-transact auto-transact-reducer
                   :hyperfiddle.runtime/user-id user-id-reducer
                   :hyperfiddle.runtime/user user-reducer
+
+                  :hyperfiddle.ide/focused-fiddle ide-focus-reducer
 
                   ; user
                   :display-mode display-mode-reducer
