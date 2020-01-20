@@ -1,5 +1,9 @@
 (ns hyperfiddle.fiddle
+  #?(:cljs
+     (:require-macros
+       [backtick :refer [template]]))
   (:require
+    #?(:clj [backtick :refer [template]])
     [cats.context]
     [cats.core :as cats :refer [>>=]]
     [cats.monad.either :as either :refer [right]]
@@ -9,7 +13,7 @@
     [contrib.datomic.client.pull :as client-pull]
     [contrib.reader]
     [contrib.string :refer [or-str]]
-    [contrib.template :as template]
+    [contrib.template :refer [load-resource]]
     [contrib.try$ :refer [try-either]]
     [cuerdas.core :as str]
     [datascript.parser]
@@ -154,7 +158,7 @@
   {:fiddle/markdown (fn [fiddle] (str/fmt "### %s" (some-> fiddle :fiddle/ident str)))
    :fiddle/pull (constantly "[:db/id\n *]")
    :fiddle/pull-database (constantly "$")
-   :fiddle/query (constantly (template/load-resource "fiddle-query-default.edn"))
+   :fiddle/query (constantly (load-resource "fiddle-query-default.edn"))
    :fiddle/eval (constantly "[{:foo (inc 42)}]")
    :fiddle/renderer (constantly default-renderer-str)
    :fiddle/type (constantly :blank)})                       ; Toggling default to :query degrades perf in ide
@@ -223,11 +227,13 @@
 (defn parse-fiddle-query+ [{:keys [fiddle/type fiddle/query fiddle/pull fiddle/pull-database]}]
   (case type
     :blank (right nil)
-    :eval (right nil)
+    :eval (try-either
+            (datascript.parser/parse-query (template [:find [(pull $ ?e [*]) ...] :in $ :where [$ ?e]])))
     :entity (>>= (contrib.reader/memoized-read-edn-string+ pull)
                  (fn [pull]
                    (try-either
                      (let [source (symbol pull-database)
+                           ;fake-q (template [:find (pull ~source ?e ~pull) . :in ~source :where [~source ?e]])
                            fake-q `[:find (~'pull ~source ~'?e ~pull) . :in ~source :where [~source ~'?e]]]
                        (datascript.parser/parse-query fake-q)))))
     :query (>>= (contrib.reader/memoized-read-edn-string+ query)
