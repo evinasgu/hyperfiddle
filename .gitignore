@@ -3,3 +3,4 @@
 /out
 /project.clj
 /node_modules
+/.cpcache
