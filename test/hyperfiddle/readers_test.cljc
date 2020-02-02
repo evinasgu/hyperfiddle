@@ -98,7 +98,7 @@
 
 ; Test saffolding needs to be improved to distinguish readers
 #_(deftest EvalReq []
-                 (test-all-forms (->EvalRequest "foo")
+                 (test-all-forms (->EvalRequest "foo" "pid" {:hyperfiddle.route/where nil})
                    #hypercrud.types.QueryRequest.EvalRequest{:form "foo"}
                    "#hypercrud.types.QueryRequest.EvalRequest{:form \"foo\"}"
                    "{\"~#EvalReq\":[\"foo\"]}")

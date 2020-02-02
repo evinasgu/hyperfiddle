@@ -53,7 +53,20 @@
         needles (contrib.data/xorxs corcs #{})]
     ; haystack must have all the needles
     (clojure.set/superset? haystack needles)))
-(defn cardinality [this a] (get (attr this a) :db/cardinality))
+(defn cardinality [this a]
+  ; TODO needs to respect qfind types
+  ; If datomic schema is added out of band, don't need specs here
+  (get (attr this a) :db/cardinality)
+  #_(or (get (attr this a) :db/cardinality)
+      (let [spec (s/form a)]
+        (if (seq? spec)
+          (let [[x & xs] spec]
+            (if (= x `s/coll-of)
+              :db.cardinality/many))))
+      :db.cardinality/one))
+(comment
+  (cardinality nil :user/teachers)
+  )
 (defn cardinality? [this a k] (= k (cardinality this a)))
 (defn isComponent [this a] (get (attr this a) :db/isComponent)) ; follows Datomic naming case conventions
 (defn valueType [this a] (get (attr this a) :db/valueType))
@@ -182,7 +195,7 @@ Shape is normalized to match the shape of the Datomic result, e.g. [:user/a-ref]
          (fn [acc k v]
            (conj acc (cond
                        (= :db/id k) k
-                       (ref? schema k) {k (condp = (cardinality schema k)
+                       (ref? schema k) {k (condp = (cardinality schema k) ; what if not found? What if wonky shape that doesn't fit Datomic shapes? what if cardinality/relations? Spec, polymorphism w/o schema. Have the v
                                             :db.cardinality/one (tree-derivative schema v)
                                             :db.cardinality/many (apply pull-union (map (partial tree-derivative schema) v)))}
                        :else k)))
@@ -296,7 +309,7 @@ Shape is normalized to match the shape of the Datomic result, e.g. [:user/a-ref]
   [schemas ?qfind ?data]
   #_{:pre [schemas ?qfind]
      :post [vector?]}                                       ; associative by index
-  (when ?qfind
+  (if ?qfind
     (let [?data (normalize-result ?qfind ?data)]            ; nil data can mean no query or invalid query, we can still draw forms
       (->> (datascript.parser/find-elements ?qfind)
            (map-indexed (fn [i element]
@@ -317,7 +330,13 @@ Shape is normalized to match the shape of the Datomic result, e.g. [:user/a-ref]
                                      enclosure              ; loses pull order
                                      ; Do not inline enclosure, it causes reaction bugs
                                      )))))
-           vec))))
+           vec))
+
+    ; What shape do we have? {} [{}] [[{}]] <something else>
+    ; Get to the pulled trees, call pull-enclosure
+    ; cardinaltiy of non-modeled attrs?
+    #_(pull-enclosure (get schemas "$") nil ?data)
+    nil))
 
 (defn spread-elements! [f schemas qfind data]
   (spread-elements (fn [ix e coll-normalized]

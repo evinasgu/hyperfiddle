@@ -69,6 +69,8 @@
 
 (def browser-query-limit 50)
 
+; This factoring is legacy, can the whole thing can be inlined right above the datomic IO?
+; UI runs it as validation for tooltip warnings (does the query match the params)
 (defn request-for-fiddle+ [rt pid route fiddle]             ; no ctx
   (case (:fiddle/type fiddle)
     :query (mlet [q (reader/memoized-read-string+ (:fiddle/query fiddle)) ; todo why read-string instead of read-edn-string?
@@ -119,8 +121,11 @@
     (let [form (-> #_(memoized-read-edn-string+ (:fiddle/eval fiddle))
                  (reader/memoized-read-string+ (:fiddle/eval fiddle))
                  (either/branch (constantly nil) identity))]
-      ; dbval is reconstructed from the pid on the backend
-      (either/right (->EvalRequest form pid)))
+      ; todo, this path needs abstraction assistance for paging/offset
+      (either/right (->EvalRequest form
+                                   pid                      ; dbval is reconstructed from the pid on the backend
+                                   ; ::route/where ::route/datomic-args
+                                   route)))                 ; Other request types are able to abstract over the route; but the eval path needs full control
 
     :entity
     (let [args (::route/datomic-args route)                 ; Missing entity param is valid state now https://github.com/hyperfiddle/hyperfiddle/issues/268
@@ -155,7 +160,7 @@
          ;:let [_ (println "route " route)]
          route (try-either (route/invert-route route (partial runtime/tempid->id! rt pid)))
          ;:let [_ (println "route " route)]
-         r-fiddle @(r/apply-inner-r (r/track hydrate-fiddle+ rt pid (::route/fiddle route)))
+         r-fiddle @(r/apply-inner-r (r/track hydrate-fiddle+ rt pid (::route/fiddle route))) ; inline query
          ;:let [_ (println "fiddle " @r-fiddle)]
          r-request @(r/apply-inner-r (r/fmap->> r-fiddle (request-for-fiddle+ rt pid route)))
          ;:let [_ (println "request " @r-request)]

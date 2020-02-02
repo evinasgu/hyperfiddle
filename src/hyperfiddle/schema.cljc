@@ -26,7 +26,7 @@
                        dbnames)]
     (-> (io/hydrate-requests (runtime/io rt) local-basis partitions requests)
         (p/then (fn [{:keys [pulled-trees]}]
-                  (->> pulled-trees
+                  (->> pulled-trees                         ; add local schemas from spec here?
                        (map (fn [pulled-tree+]
                               (-> (cats/fmap #(contrib.datomic/indexed-schema (mapv first %)) pulled-tree+)
                                   (either/branch exception/failure exception/success))))

@@ -183,7 +183,7 @@
                  (string/join "/"))]
            (when (> (hypercrud.browser.context/pull-depth ctx) 0) ; differentiate pull from fiddle-ident
              [(contrib.datomic/valueType @(:hypercrud.browser/schema ctx) a)
-              (contrib.datomic/cardinality @(:hypercrud.browser/schema ctx) a)
+              (contrib.datomic/cardinality @(:hypercrud.browser/schema ctx) a) ; probably have result here
               (if (contrib.datomic/isComponent @(:hypercrud.browser/schema ctx) a) :component)])
            (:hypercrud.browser/pull-path ctx))              ; pullpath is legacy, remove from css todo
          (map css-slugify)
@@ -452,6 +452,7 @@ User renderers should not be exposed to the reaction."
               (str/format "Warning: Query resultset has been truncated to %s records."
                           base/browser-query-limit)])
     :blank nil
+    :eval nil
     ))
 
 (defn form "Not an abstraction." [columns val ctx & [props]]
@@ -473,6 +474,7 @@ User renderers should not be exposed to the reaction."
   {:pre [(s/assert :hypercrud/context ctx)]}
   (let [[_ a _] (context/eav ctx)]
     ; detect top and do fiddle-level here, instead of in columns?
+    ; have result here to infer cardinality when schema absent
     (match* [(contrib.datomic/cardinality @(:hypercrud.browser/schema ctx) a)] ; this is parent - not focused?
       [:db.cardinality/one] [:<>
                              (controls/hf-new val ctx)
@@ -510,13 +512,12 @@ nil. call site must wrap with a Reagent component"          ; is this just hyper
         (hint val ctx props)
         (when-let [unfilled-where (:hf/where props)]
           [needle-input2 ctx props])
-        (condp some [(type @(:hypercrud.browser/qfind ctx))] ; spread-rows
-
-          #{FindRel FindColl}
-          [table table-column-product ctx props]            ; identical result?
-
-          #{FindTuple FindScalar}
-          [form table-column-product val ctx props])]))])
+        (let [qtype (type @(:hypercrud.browser/qfind ctx))] ; i think we need to make up a qfind for this case
+          (if-not qtype
+            [table table-column-product ctx props]
+            (condp some [qtype]                             ; spread-rows
+              #{FindRel FindColl} [table table-column-product ctx props] ; identical result?
+              #{FindTuple FindScalar} [form table-column-product val ctx props])))]))])
 
 ;(defmethod render :hf/blank [ctx props]
 ;  [iframe-field-default val ctx props])

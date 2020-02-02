@@ -294,6 +294,7 @@ a speculative db/id."
    (assert (not (:hypercrud.browser/head-sentinel ctx)) "this whole flag is trouble, not sure if this assert is strictly necessary")
    (case (contrib.datomic/cardinality @(:hypercrud.browser/schema ctx) a)
 
+     ; For absense of schema provider, we can inspect result here
      :db.cardinality/one
      ctx
 
@@ -342,7 +343,7 @@ a speculative db/id."
         :else
         (let [k (last result-path)
               is-awaiting-rowkey (and (keyword? k)
-                                      (= :db.cardinality/many (contrib.datomic/cardinality
+                                      (= :db.cardinality/many (contrib.datomic/cardinality ; have result to infer cardinality
                                                                 @(:hypercrud.browser/schema ctx) k)))]
           (if is-awaiting-rowkey
             @result                                         ; We hang on to sets as we descend
@@ -675,7 +676,7 @@ a speculative db/id."
           (index-result ctx a')))
       ; V is for formulas, E is for security and on-change. V becomes E. E is nil if we don't know identity.
       (assoc ctx :hypercrud.browser/eav                     ; insufficent stability on r-?v? fixme
-                 (case (contrib.datomic/cardinality @(:hypercrud.browser/schema ctx) a')
+                 (case (contrib.datomic/cardinality @(:hypercrud.browser/schema ctx) a') ; have result data to infer cardinality in absense of schema
                    :db.cardinality/many (r/fmap-> (:hypercrud.browser/eav ctx) (stable-eav-a a')) ; dont have v yet
                    :db.cardinality/one (r/fmap-> (:hypercrud.browser/eav ctx) (stable-eav-av a' (v! ctx)))
                    ; Gracefully fail but still render.
@@ -734,7 +735,7 @@ a speculative db/id."
     ; could also dispatch on qfind. Is fiddle/type unnecessary now?
     (condp some [(:fiddle/type @r-fiddle)]
       #{:blank} []
-      #{:eval} []                                           ; what to do here? We need to like model it
+      #{:eval} [[(:fiddle/ident @r-fiddle) ctx]]            ; Option[Tuple[_]]
       #{:query :entity} [[(:fiddle/ident @r-fiddle)
                           ; inference is lazy
                           ; But it needs to add something, so that we know that it is inferrable now

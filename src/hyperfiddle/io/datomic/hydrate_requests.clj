@@ -13,6 +13,7 @@
     [hypercrud.types.EntityRequest]
     [hypercrud.types.QueryRequest]
     [hypercrud.types.DbRef :refer [->DbRef]]
+    [hyperfiddle.api :as hf]
     [hyperfiddle.domain :as domain]
     [hyperfiddle.io.bindings]                               ; userland
     [hyperfiddle.io.datomic :as d]
@@ -49,19 +50,13 @@
                            :args (map #(parameter % get-secure-db-with) params)))]
     (q arg-map)))
 
-(def ^:dynamic *$* nil)
 
-(defmethod hydrate-request* EvalRequest [{:keys [form pid]} domain get-secure-db-with]
+
+(defmethod hydrate-request* EvalRequest [{:keys [form pid route]} domain get-secure-db-with]
   {:pre [form]}
-  (let [form' (->> form
-                   (postwalk (fn [sym]
-                              (if (and (symbol? sym)
-                                       (= (name sym) "$") #_(clojure.string/starts-with? (name sym) "$"))
-                                `*$*
-                                sym)))
-                   doall)]
-    (binding [*$* (:db (get-secure-db-with "$" pid))]
-      (eval form'))))
+  (binding [hf/*route* route
+            hf/*$* (:db (get-secure-db-with "$" pid))]
+    (eval form)))
 
 ; todo i18n
 (def ERROR-BRANCH-PAST ":hyperfiddle.error/basis-stale Branching the past is currently unsupported, please refresh your basis by refreshing the page")

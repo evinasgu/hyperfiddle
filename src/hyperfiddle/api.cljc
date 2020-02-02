@@ -66,6 +66,8 @@
     ;:hf/blank
     ))
 
+#?(:clj (def ^:dynamic *route* nil))
+#?(:clj (def ^:dynamic *$* nil))
 
 (defmethod tx :default [ctx eav props]
   nil)
